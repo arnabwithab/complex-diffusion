@@ -3,9 +3,9 @@
   "last_updated": "2026-09-18",
   "summary": {
     "total": 11,
-    "completed": 7,
+    "completed": 8,
     "in_progress": 0,
-    "planned": 4,
+    "planned": 3,
     "tests_passing": 0,
     "tests_failing": 0,
     "tests_missing": 11
@@ -245,7 +245,7 @@
       "id": "F008",
       "name": "fixed-prompt generation",
       "description": "Sample first 20 validation conversations for both checkpoints: 32 denoising steps, 128 tokens, identical LLaDA-style confidence remasking and settings, EOS/doc rules mirrored from training.",
-      "status": "planned",
+      "status": "completed",
       "priority": "medium",
       "module": "src/generate.py",
       "design_doc": "docs/spec.md",
@@ -260,12 +260,12 @@
         {
           "id": "F008-1",
           "name": "prompt set + sampling script",
-          "status": "planned"
+          "status": "completed"
         }
       ],
       "notes": "",
       "added": "2026-09-18",
-      "completed": null
+      "completed": "2026-09-18"
     },
     {
       "id": "F009",
