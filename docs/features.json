@@ -115,7 +115,7 @@
     {
       "id": "F004",
       "name": "masked diffusion loss and sampler",
-      "description": "MDLM compute_loss port: absorbing-state forward, t=(1-eps)*u+eps eps=1e-3, 1/t weight in fp32, antithetic pairing per 32-row micro-batch, mask prob 1-t, EOS never masked, SUBS (-inf on MASK logit), CE on masked only. Plus LLaDA-style 32-step confidence unmask/remask sampler.",
+      "description": "MDLM compute_loss port: absorbing-state forward, t=(1-eps)*u+eps eps=1e-3, 1/t weight in fp32, antithetic pairing per 16-row micro-batch, mask prob 1-t, EOS never masked, SUBS (-inf on MASK logit), CE on masked only. Plus LLaDA-style 32-step confidence unmask/remask sampler.",
       "status": "completed",
       "priority": "high",
       "module": "src/diffusion.py",
@@ -177,7 +177,7 @@
     {
       "id": "F006",
       "name": "training loop",
-      "description": "Identical-hypers A/B loop: ~2300 steps x batch 128 (32x4 accum) x 512 (~150M tokens), AdamW (0.9,0.95) wd 1e-5, clip 1.0, LR in {3e-4,1e-3} via preflight probe, cosine to LR/10 + 230-step warmup, fp16 AMP (fp32 loss) with bf16 flag, no grad checkpointing (fits 16GB), ckpt every 500 + resume, gate-sum histogram logging.",
+      "description": "Identical-hypers A/B loop: ~2300 steps x batch 128 (16x8 accum) x 512 (~150M tokens), AdamW (0.9,0.95) wd 1e-5, clip 1.0, LR in {3e-4,1e-3} via preflight probe, cosine to LR/10 + 230-step warmup, fp16 AMP (fp32 loss) with bf16 flag, torch.compile, no grad checkpointing (micro-16 fits natively), ckpt every 500 + resume, gate-sum histogram logging.",
       "status": "completed",
       "priority": "high",
       "module": "src/train.py",

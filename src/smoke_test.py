@@ -29,12 +29,11 @@ def test_init_rms():
         m = build_model(v).eval()
         h = m.embed(ids) if v == "A" else m.embed(ids).view(B, N, 368, 2)
         with torch.no_grad():
-            for b in m.blocks:
+            for i, b in enumerate(m.blocks):
                 h = b(h, doc, pos)
-        rms = float(h.pow(2).mean().sqrt()) if v == "A" else float(
-            h.pow(2).sum(-1).mean().sqrt())
-        print(v, "final residual RMS", round(rms, 3))
-        assert 0.05 < rms < 10  # order-unity at init, neither vanished nor exploded
+                rms = float(h.pow(2).mean().sqrt()) if v == "A" else float(
+                    h.pow(2).sum(-1).mean().sqrt())
+                assert 0.05 < rms < 5, (v, i, rms)  # per-layer order-unity
 
 
 def test_rope_identity_and_rotation():

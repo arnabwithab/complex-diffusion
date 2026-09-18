@@ -46,7 +46,7 @@ Both variants share the same block skeleton (RMSNorm → attention → residual;
 - Size: **51M params each** (locked; see §2 config table).
 - Sequence length: 512 packed. Probes additionally evaluated at 1024 (free long-range extrapolation read; both variants will degrade — RoPE does not extrapolate natively — so the 1024 read is *relative*).
 - Tokenizer: GPT-2 BPE + `[MASK]` added (id 50,257) → vocab 50,258.
-- Training objective: masked diffusion — absorbing-state forward process, 1/t-weighted ELBO loss (MDLM parameterization, **ported verbatim** from kuleshov-group/mdlm `compute_loss`): t = (1−ε)·u + ε with u ~ U(0,1) and **ε = 1e-3** (verified against MDLM's master config `sampling_eps`; bounds the 1/t weight at 1000); MDLM-style antithetic pairing within each 32-row micro-batch; mask prob 1−t; cross-entropy on masked positions only, with **SUBS** — the [MASK]-id logit is set to −∞ where the likelihood is evaluated, killing the trivial predict-the-mask short-circuit (exact placement ported from MDLM's code, which is ground truth where this spec is ambiguous). All t/mask RNG derives from (seed, step, micro-batch) — resume-safe. Loss and 1/t weight computed in fp32 outside autocast.
+- Training objective: masked diffusion — absorbing-state forward process, 1/t-weighted ELBO loss (MDLM parameterization, **ported verbatim** from kuleshov-group/mdlm `compute_loss`): t = (1−ε)·u + ε with u ~ U(0,1) and **ε = 1e-3** (verified against MDLM's master config `sampling_eps`; bounds the 1/t weight at 1000); MDLM-style antithetic pairing within each 16-row micro-batch; mask prob 1−t; cross-entropy on masked positions only, with **SUBS** — the [MASK]-id logit is set to −∞ where the likelihood is evaluated, killing the trivial predict-the-mask short-circuit (exact placement ported from MDLM's code, which is ground truth where this spec is ambiguous). All t/mask RNG derives from (seed, step, micro-batch) — resume-safe. Loss and 1/t weight computed in fp32 outside autocast.
 - Inference: LLaDA-style confidence-based iterative unmask-and-remask sampling.
 
 ## 4. Hardware / venue (locked)
@@ -55,7 +55,7 @@ Both variants share the same block skeleton (RMSNorm → attention → residual;
 - **Pre-flight before the full run commits:** a 50-step throughput probe validates the wall-clock estimate, then a 500-step × 2-LR (3e-4 / 1e-3) × both-variants probe (~1h, parallel) selects the training LR per the §5 rule.
 - T4 is Turing — **no bf16** → fp16 AMP + gradient scaler; the 1/t-weighted loss stays in fp32 (overflow guard, since the weight can reach 1000× at small t).
 - `--amp bf16` flag retained for the 8GB laptop fallback (sequential runs, ~3–4h each at this scale).
-- Gradient checkpointing: on. Micro-batch 32 × grad-accum 4 = effective batch 128.
+- Micro-batch 16 × grad-accum 8 = effective batch 128. No gradient checkpointing (micro-16 fits natively; checkpointing is incompatible with torch.compile).
 - Checkpoint every 500 steps + auto-resume (session-death insurance).
 - 8-bit Adam dropped — 51M params fit fp32 AdamW states in <1GB; no bitsandbytes dependency.
 
@@ -110,7 +110,7 @@ Self-authored generators (task *shapes* follow PCT §3.5; no code borrowed), det
 ## 7. Deliverables
 
 1. Model definitions for variant A (real, Apple sigmoid-gated attention) and variant B (complex, PCT-gated attention), parameter-matched (asserted < 0.5% in smoke test).
-2. MDLM-style training loop (masked diffusion objective, fp16/bf16 AMP, gradient checkpointing, checkpoint/resume).
+2. MDLM-style training loop (masked diffusion objective, fp16/bf16 AMP, torch.compile, checkpoint/resume).
 3. ultrachat_200k data pipeline (download/subsample/tokenize/pack + doc masks).
 4. Copy Memory + NIAH synthetic eval generators and eval script.
 5. Generation/sampling script for both variants on the fixed 20-prompt set.

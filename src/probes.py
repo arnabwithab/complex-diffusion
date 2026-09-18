@@ -56,7 +56,7 @@ def gen_copy(rng, k, window=512, n_demos=2, demo_fill=32):
     ids = join(parts)
     assert len(ids) <= window, (len(ids), window)
     pad = window - len(ids)
-    ids = torch.cat([ids, torch.full((pad,), FILLER)])  # right-pad filler, not scored
+    ids = torch.cat([ids, torch.full((pad,), EOT)])  # neutral pad, own doc
     mask = torch.zeros(window, dtype=torch.bool)
     ans_start = n_demos * (demo_len + 1) + (k + 1 + fill + 1)
     mask[ans_start : ans_start + k] = True
@@ -91,7 +91,7 @@ def gen_niah(rng, depth, window=512, demo_h=64):
             key = needle
     ids = join(parts)
     assert len(ids) <= window, (len(ids), window)
-    ids = torch.cat([ids, torch.full((window - len(ids),), NIAH_IDS[0])])
+    ids = torch.cat([ids, torch.full((window - len(ids),), EOT)])
     mask = torch.zeros(window, dtype=torch.bool)
     ans_pos = 2 * (demo_len + 1) + (h + 1)
     mask[ans_pos] = True
@@ -130,11 +130,10 @@ def run_cell(model, cell, n=N_SAMPLES, seed=0, device="cpu", steps=32):
             seq_hit += int(pred.item() == key)
             tot += 1
     acc = (tok_hit if kind == "copy" else seq_hit) / tot
-    lo, hi = wilson(acc, n)
+    lo, hi = wilson(acc, tot)  # per-token trials for copy, n for NIAH
     ch = chance(cell)
-    void = acc <= 2 * ch
     return {"acc": acc, "exact": seq_hit / n, "n": n, "ci": (lo, hi),
-            "chance": ch, "void": void}
+            "chance": ch, "below_floor": acc <= 2 * ch}
 
 
 def cells():
@@ -154,11 +153,12 @@ def main():
     device = torch.device(args.device)
     model = build_model(args.variant).to(device).eval()
     model.load_state_dict(torch.load(args.ckpt, map_location=device)["model"])
-    print(f"{'cell':22s} {'acc':>7s} {'ci95':>17s} {'void':>5s}")
+    print(f"{'cell':22s} {'acc':>7s} {'ci95':>17s} {'floor':>5s}")
     for c in cells():
         r = run_cell(model, c, n=args.n, device=device)
         print(f"{str(c):22s} {r['acc']*100:6.2f}% "
-              f"[{r['ci'][0]*100:5.2f},{r['ci'][1]*100:5.2f}] {str(r['void']):>5s}")
+              f"[{r['ci'][0]*100:5.2f},{r['ci'][1]*100:5.2f}] {str(r['below_floor']):>5s}")
+    print("floor = per-variant acc <= 2x chance; cell void iff BOTH variants floor")
 
 
 if __name__ == "__main__":

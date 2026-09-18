@@ -76,17 +76,28 @@ class ComplexLinear(nn.Module):
         )
 
 
-def _rope_tables(n_pairs, max_seq, base=ROPE_BASE, device=None, dtype=None):
-    inv = 1.0 / (base ** (torch.arange(0, n_pairs, device=device, dtype=dtype) / n_pairs))
-    t = torch.arange(max_seq, device=device, dtype=dtype)
-    freqs = torch.outer(t, inv)
-    return freqs.cos(), freqs.sin()
+_ROPE_CACHE = {}
+ROPE_MAX = 2048  # covers 512 train / 1024 probe doc-relative positions
+
+
+def _rope_tables(n_pairs, device=None):
+    # fp32 tables, cached per (pairs, device); indexed by pos (no rebuilds,
+    # compile-safe: static shapes after first trace).
+    key = (n_pairs, str(device))
+    t = _ROPE_CACHE.get(key)
+    if t is None:
+        inv = 1.0 / (ROPE_BASE ** (torch.arange(0, n_pairs) / n_pairs))
+        fr = torch.outer(torch.arange(ROPE_MAX).float(), inv)
+        t = (fr.cos(), fr.sin())
+        _ROPE_CACHE[key] = t
+    c, s = t
+    return c.to(device), s.to(device)
 
 
 def _rope_apply(x, pos, n_pairs):
     # x: [B, H, N, hd]; pairs (2d, 2d+1); pos: [B, N] doc-relative
-    cos, sin = _rope_tables(n_pairs, int(pos.max()) + 1, device=x.device, dtype=x.dtype)
-    c, s = cos[pos], sin[pos]  # [B, N, pairs]
+    cos, sin = _rope_tables(n_pairs, x.device)
+    c, s = cos[pos].to(x.dtype), sin[pos].to(x.dtype)  # [B, N, pairs]
     c, s = c[:, None, :, :], s[:, None, :, :]
     x1, x2 = x[..., 0::2], x[..., 1::2]
     return torch.stack([x1 * c - x2 * s, x1 * s + x2 * c], -1).flatten(-2)
@@ -171,7 +182,8 @@ class BlockA(nn.Module):
 
     def forward(self, x, doc_ids, pos):
         x = x + self.attn(self.n1(x), doc_ids, pos)
-        return x + self.down(F.silu(self.gate(self.n2(x))) * self.up(self.n2(x)))
+        h = self.n2(x)
+        return x + self.down(F.silu(self.gate(h)) * self.up(h))
 
 
 class BlockB(nn.Module):

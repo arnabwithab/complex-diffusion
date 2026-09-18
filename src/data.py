@@ -37,35 +37,31 @@ def chunk_ids(ids, seq=SEQ):
     return [ids[i : i + seq] for i in range(0, len(ids), seq)]
 
 
-def pack_rows(chunks, seq=SEQ, eos=EOS_ID):
-    """Greedy-pack chunks into exact-seq rows joined by EOS. Drops tail."""
+def pack_rows(pieces, seq=SEQ):
+    """Greedy-pack pre-terminated pieces into exact-seq rows. No padding.
+
+    Pieces carry their own EOS (conv-final only); continuations concatenate
+    with no separator. Overflow splits across rows, never truncates.
+    """
     rows, cur = [], []
-    for ch in chunks:
-        piece = ch + [eos]
-        if len(cur) + len(piece) > seq:
+    for p in pieces:
+        p = list(p)
+        while p:
+            take = seq - len(cur)
+            cur += p[:take]
+            p = p[take:]
             if len(cur) == seq:
                 rows.append(cur)
                 cur = []
-            else:
-                cur = (cur + piece)[:seq]  # rare >seq chunk truncates
-                if len(cur) == seq:
-                    rows.append(cur)
-                    cur = []
-                continue
-        cur = cur + piece
-        if len(cur) == seq:
-            rows.append(cur)
-            cur = []
-    # merge leftover into full rows only; no padding
-    return torch.tensor(rows, dtype=torch.long)
+    return torch.tensor(rows, dtype=torch.long)  # tail dropped, no padding
 
 
 def build_rows(tokenizer, conversations, seq=SEQ):
-    chunks = []
+    pieces = []
     for conv in conversations:
-        ids = tokenizer(format_conversation(conv))["input_ids"]
-        chunks.extend(chunk_ids(ids, seq - 1))  # room for EOS joins
-    packed = pack_rows(chunks, seq)
+        full = tokenizer(format_conversation(conv))["input_ids"] + [EOS_ID]
+        pieces.extend(chunk_ids(full, seq - 1))  # EOS only at conv end
+    packed = pack_rows(pieces, seq)
     logger.info("packed %d rows (~%.1fM tokens)", len(packed), packed.numel() / 1e6)
     return packed
 

@@ -1,4 +1,4 @@
-"""Identical-hypers A/B training loop: MDLM loss, AMP, grad ckpt, cosine schedule."""
+"""Identical-hypers A/B training loop: MDLM loss, AMP, torch.compile, cosine schedule."""
 
 import argparse
 import logging
@@ -14,7 +14,7 @@ from model import build_model
 
 logger = logging.getLogger(__name__)
 
-MICRO, ACCUM, BATCH = 32, 4, 128  # effective batch 128
+MICRO, ACCUM, BATCH = 16, 8, 128  # effective batch 128; micro 16 fits w/o ckpt
 SEQ = 512
 TARGET_TOKENS = 150_000_000
 WARMUP = 230
@@ -35,28 +35,26 @@ def ckpt_path(d, variant):
 
 def save(d, variant, model, opt, scaler, step):
     os.makedirs(d, exist_ok=True)
+    raw = model._orig_mod if hasattr(model, "_orig_mod") else model  # unwrap compile
     torch.save(
-        {"step": step, "model": model.state_dict(), "opt": opt.state_dict(),
+        {"step": step, "model": raw.state_dict(), "opt": opt.state_dict(),
          "scaler": scaler.state_dict() if scaler else None},
         ckpt_path(d, variant),
     )
 
 
-def load(d, variant, model, opt, scaler):
+def load(d, variant, model, opt, scaler, device):
     p = ckpt_path(d, variant)
     if not os.path.exists(p):
         return 0
-    ck = torch.load(p, map_location="cpu")
-    model.load_state_dict(ck["model"])
+    ck = torch.load(p, map_location=device)  # keep opt states on device
+    raw = model._orig_mod if hasattr(model, "_orig_mod") else model
+    raw.load_state_dict(ck["model"])
     opt.load_state_dict(ck["opt"])
     if scaler and ck["scaler"]:
         scaler.load_state_dict(ck["scaler"])
     logger.info("resumed %s at step %d", variant, ck["step"])
     return ck["step"]
-
-
-def forward_ckpt(model, ids, doc, pos):
-    return model(ids, doc, pos)  # no grad checkpointing: 51M fits in 16GB
 
 
 def val_elbo(model, val, device, n_batches=8):
@@ -91,39 +89,26 @@ def train(args):
     use_amp = args.amp in ("fp16", "bf16") and device.type == "cuda"
     dtype = torch.float16 if args.amp == "fp16" else torch.bfloat16
     scaler = torch.amp.GradScaler("cuda") if use_amp and dtype == torch.float16 else None
-    step = load(args.ckpt, args.variant, model, opt, scaler)
+    step = load(args.ckpt, args.variant, model, opt, scaler, device)
     model.train()
 
     t0, tokens = time.time(), 0
     while step < total:
         opt.zero_grad()
+        for g in opt.param_groups:
+            g["lr"] = schedule(step, total, args.lr)
+        step_loss = 0.0
         for mb in range(ACCUM):
             idx = order[((step * BATCH + mb * MICRO) % len(order)) :][:MICRO]
             if len(idx) < MICRO:  # wrap
                 idx = torch.cat([idx, order[: MICRO - len(idx)]])
             ids = train_rows[idx].to(device)
             doc, pos = doc_ids_positions(ids)
-            for g in opt.param_groups:
-                g["lr"] = schedule(step, total, args.lr)
             ctx = torch.amp.autocast("cuda", dtype) if use_amp else nullcontext()
             with ctx:
-                from diffusion import forward_diffuse, sample_t, _rng, MASK_ID, EOS_ID
-
-                rng = _rng(SEED, step, mb)
-                t = sample_t(MICRO, rng=rng).to(device)
-                with torch.no_grad():
-                    noisy, mask = forward_diffuse(ids, t, rng)
-                import torch.nn.functional as F
-
-                logits = forward_ckpt(model, noisy, doc, pos).float()
-                logits[..., MASK_ID] = -float("inf")
-                if mask.any():
-                    nll = F.cross_entropy(logits[mask], ids[mask], reduction="none")
-                    w = (1.0 / t).unsqueeze(-1).expand_as(ids)[mask]
-                    loss = (w * nll).mean() / ACCUM
-                else:
-                    loss = torch.zeros((), device=device)
+                loss = compute_loss(model, ids, doc, pos, SEED, step, mb) / ACCUM
             (scaler.scale(loss) if scaler else loss).backward()
+            step_loss += float(loss.detach()) * ACCUM
         if scaler:
             scaler.unscale_(opt)
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -139,7 +124,7 @@ def train(args):
                      if getattr(b.attn, "last_gate_sum", None) is not None]
             gmsg = f"{float(sum(gates)/len(gates)):.2f}" if gates else "n/a"
             logger.info("step %d loss %.3f tok/s %d gatesum %s",
-                        step, float(loss.detach()) * ACCUM,
+                        step, step_loss / ACCUM,
                         int(tokens / (time.time() - t0)), gmsg)
         if step % CKPT_EVERY == 0:
             save(args.ckpt, args.variant, model, opt, scaler, step)
@@ -156,7 +141,7 @@ def main():
     ap.add_argument("--ckpt", default="checkpoints")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--lr", type=float, default=3e-4)
-    ap.add_argument("--steps", type=int, default=0)  # 0 = derive from 300M tokens
+    ap.add_argument("--steps", type=int, default=0)  # 0 = derive from 150M tokens
     ap.add_argument("--amp", default="fp16", choices=["fp16", "bf16", "none"])
     ap.add_argument("--compile", default=True, action=argparse.BooleanOptionalAction)
     ap.add_argument("--mode", default="full", choices=["full", "throughput", "lrs"])

@@ -45,51 +45,60 @@ def compute_loss(model, ids, doc_ids, pos, seed=0, step=0, mb=0):
     logits = model(noisy, doc_ids, pos).float()  # fp32 loss guard
     logits[..., MASK_ID] = -float("inf")  # SUBS: kill predict-the-mask shortcut
     if not mask.any():
-        return torch.zeros((), device=dev)
+        return logits.sum() * 0.0  # grad-safe zero, not a crash on backward
     nll = F.cross_entropy(logits[mask], ids[mask], reduction="none")
     w = (1.0 / t).unsqueeze(-1).expand_as(ids)[mask]
     return (w * nll).mean()
 
 
 def doc_ids_positions(ids, eot_id=EOS_ID):
-    """Doc-block ids + doc-relative RoPE positions; boundaries at EOT."""
-    B, N = ids.shape
+    """Doc-block ids + doc-relative RoPE positions; boundaries at EOT.
+
+    Vectorized (no per-element Python loop). EOT closes its own doc.
+    """
     is_eot = ids == eot_id
-    doc = torch.cumsum(is_eot.int(), 1)
-    doc = doc - doc[:, :1]  # start at 0
-    pos = torch.zeros_like(ids)
-    for b in range(B):
-        p, last = 0, 0
-        for i in range(N):
-            pos[b, i] = p
-            p = 0 if is_eot[b, i] else p + 1
+    doc = torch.cumsum(is_eot.int(), 1) - is_eot.int()
+    doc = doc - doc[:, :1]
+    idx = torch.arange(ids.shape[1], device=ids.device).expand_as(ids)
+    last_eot = torch.where(is_eot, idx, torch.full_like(idx, -1)).cummax(1).values
+    pos = torch.where(is_eot, 0, idx - last_eot - 1)  # EOT: rotation-identity
     return doc, pos
 
 
 @torch.no_grad()
 def sample(model, ids, target_mask, steps=32):
-    """Confidence unmask/remask (LLaDA-style), argmax for determinism.
+    """Confidence unmask-and-remask (LLaDA-style), argmax for determinism.
 
     ids: [B, N] with MASK at fillable slots; target_mask: slots we may fill.
-    Fills ~1/steps of remaining slots per step, most-confident first.
+    Each step unmasks top-k open slots, then remasks bottom-r filled ones
+    (lowest confidence) for revision. Final pass fills any leftovers.
     """
     cur = ids.clone()
     doc, pos = doc_ids_positions(cur)
-    remaining = target_mask & (cur == MASK_ID)
-    total = int(remaining.sum())
+    total = int((target_mask & (cur == MASK_ID)).sum())
     if total == 0:
         return cur
     per_step = max(1, math.ceil(total / steps))
+    remask_n = max(1, total // 20)
     for _ in range(steps):
         open_slots = target_mask & (cur == MASK_ID)
-        if not open_slots.any():
-            break
         logits = model(cur, doc, pos).float()
         logits[..., MASK_ID] = -float("inf")
         conf, pred = logits.max(-1)
-        conf = torch.where(open_slots, conf, torch.full_like(conf, -float("inf")))
-        k = min(per_step, int(open_slots.sum()))
-        _, idx = torch.topk(conf.view(-1), k)
-        flat_cur, flat_pred = cur.view(-1), pred.view(-1)
-        flat_cur[idx] = flat_pred[idx]
+        if open_slots.any():
+            c = torch.where(open_slots, conf, torch.full_like(conf, -float("inf")))
+            k = min(per_step, int(open_slots.sum()))
+            _, idx = torch.topk(c.view(-1), k)
+            cur.view(-1)[idx] = pred.view(-1)[idx]
+        filled = target_mask & (cur != MASK_ID)
+        if filled.any():
+            c = torch.where(filled, conf, torch.full_like(conf, float("inf")))
+            k = min(remask_n, int(filled.sum()))
+            _, idx = torch.topk((-c).view(-1), k)
+            cur.view(-1)[idx] = MASK_ID
+    rest = target_mask & (cur == MASK_ID)  # final fill of leftovers
+    if rest.any():
+        logits = model(cur, doc, pos).float()
+        logits[..., MASK_ID] = -float("inf")
+        cur[rest] = logits.argmax(-1)[rest]
     return cur
