@@ -3,9 +3,9 @@
   "last_updated": "2026-09-18",
   "summary": {
     "total": 11,
-    "completed": 6,
+    "completed": 7,
     "in_progress": 0,
-    "planned": 5,
+    "planned": 4,
     "tests_passing": 0,
     "tests_failing": 0,
     "tests_missing": 11
@@ -209,7 +209,7 @@
       "id": "F007",
       "name": "copy and NIAH probes",
       "description": "Deterministic generators (~200/cell, windows 512+1024): 2 solved demos + 1 test joined by EOT; Copy K in {8,16,32} over A-P ids 32-47 with ~ filler id 93; NIAH distractor ids 0-63 excl 30 plus 64, cue ? id 30, depths {0.1,0.25,0.5,0.75,0.9}; 32-step argmax decode on answer slots; Wilson CI + void (<=2x chance) + discrimination scoring.",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "src/probes.py",
       "design_doc": "docs/spec.md",
@@ -224,22 +224,22 @@
         {
           "id": "F007-1",
           "name": "Copy generator + scorer",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F007-2",
           "name": "NIAH generator + scorer",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F007-3",
           "name": "eval runner with CIs",
-          "status": "planned"
+          "status": "completed"
         }
       ],
       "notes": "",
       "added": "2026-09-18",
-      "completed": null
+      "completed": "2026-09-18"
     },
     {
       "id": "F008",
