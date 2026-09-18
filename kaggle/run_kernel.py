@@ -9,9 +9,22 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CANDS = ("/kaggle/working/src", os.path.join(HERE, "src"),
-         os.path.join(HERE, "..", "src"))
-SRC = next(c for c in CANDS if os.path.exists(os.path.join(c, "train.py")))
+def find_src():
+    roots = ["/kaggle/working", "/kaggle/input", HERE, os.getcwd()]
+    seen = []
+    for r in roots:
+        for dirpath, dirs, files in os.walk(r):
+            depth = dirpath.count(os.sep)
+            if depth - r.count(os.sep) > 4:
+                dirs[:] = []
+                continue
+            seen.append(dirpath)
+            if "train.py" in files and os.path.exists(os.path.join(dirpath, "model.py")):
+                return dirpath
+    raise SystemExit(f"train.py not found; searched: {seen[:20]}")
+
+
+SRC = find_src()
 os.chdir(os.path.dirname(SRC))  # kaggle runs script.py from elsewhere
 sys.path.insert(0, SRC)
 
