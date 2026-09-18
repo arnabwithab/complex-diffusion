@@ -13,8 +13,8 @@ EOS_ID = 50256
 EPS = 1e-3  # t floor; 1/t weight bounded at 1000
 
 
-def _rng(seed, step, mb):
-    g = torch.Generator()
+def _rng(seed, step, mb, device="cpu"):
+    g = torch.Generator(device=device)
     g.manual_seed((seed * 1_000_003 + step * 1_009 + mb * 917) % 2**63)
     return g
 
@@ -38,7 +38,7 @@ def forward_diffuse(ids, t, rng, eos_id=EOS_ID, mask_id=MASK_ID):
 def compute_loss(model, ids, doc_ids, pos, seed=0, step=0, mb=0):
     """1/t-weighted CE on masked positions only, SUBS, fp32."""
     dev = ids.device
-    rng = _rng(seed, step, mb)
+    rng = _rng(seed, step, mb, ids.device)
     t = sample_t(ids.shape[0], rng=rng).to(dev)
     with torch.no_grad():
         noisy, mask = forward_diffuse(ids, t, rng)
