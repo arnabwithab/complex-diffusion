@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-A/B experiment: complex-valued PCT-style attention vs real-valued sigmoid-attention control (~51M each) in a small masked diffusion LM. `docs/spec.md` is the source of truth — it wins over everything here.
+A/B experiment: complex-valued PCT-style attention vs real-valued sigmoid-attention control (~51M each) in a small masked diffusion LM. `docs/spec.md` is the source of truth — it wins over everything here. Task tracker: `docs/features.json`.
 
 ## Development Philosophy
 - Spec first: changing experiment parameters requires explicit user approval.

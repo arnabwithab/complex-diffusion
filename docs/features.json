@@ -1,0 +1,334 @@
+{
+  "project": "complex-diffusion",
+  "last_updated": "2026-09-18",
+  "summary": {
+    "total": 11,
+    "completed": 0,
+    "in_progress": 0,
+    "planned": 11,
+    "tests_passing": 0,
+    "tests_failing": 0,
+    "tests_missing": 11
+  },
+  "features": [
+    {
+      "id": "F001",
+      "name": "project scaffolding",
+      "description": "Minimal repo layout with package manager, formatter/linter, and empty src modules so TDD can start. Covers pyproject (uv, python>=3.12, torch, transformers, datasets), black+ruff config, src/ stubs, kaggle/ and results/ dirs.",
+      "status": "planned",
+      "priority": "high",
+      "module": "core/infra",
+      "design_doc": "docs/spec.md",
+      "tests": {
+        "status": "missing",
+        "files": [],
+        "notes": "import check: every src module imports cleanly on CPU"
+      },
+      "subtasks": [
+        {
+          "id": "F001-1",
+          "name": "pyproject + tool config",
+          "status": "planned"
+        },
+        {
+          "id": "F001-2",
+          "name": "src/kaggle/results dirs",
+          "status": "planned"
+        }
+      ],
+      "notes": "",
+      "added": "2026-09-18",
+      "completed": null
+    },
+    {
+      "id": "F002",
+      "name": "variant A backbone and attention",
+      "description": "Real-valued LLaMA-style block (RMSNorm, SwiGLU h=1408, RoPE base 10000, non-causal doc-blocked) with Apple sigmoid attention (alpha=sigmoid(QK^T/sqrt(d)+b), b init -log N). Width d=512, 8 layers/8 heads, tied 50258x512 embedding.",
+      "status": "planned",
+      "priority": "high",
+      "module": "src/model.py",
+      "design_doc": "docs/spec.md",
+      "tests": {
+        "status": "missing",
+        "files": ["src/smoke_test.py"],
+        "notes": "param count ~51.4M; init RMS ~1; RoPE identity; 20-step overfit finite"
+      },
+      "subtasks": [
+        {
+          "id": "F002-1",
+          "name": "RMSNorm + SwiGLU + RoPE + doc-block mask",
+          "status": "planned"
+        },
+        {
+          "id": "F002-2",
+          "name": "sigmoid attention block",
+          "status": "planned"
+        },
+        {
+          "id": "F002-3",
+          "name": "tied embedding + output head",
+          "status": "planned"
+        }
+      ],
+      "notes": "",
+      "added": "2026-09-18",
+      "completed": null
+    },
+    {
+      "id": "F003",
+      "name": "variant B complex PCT attention",
+      "description": "Complex-valued twin of F002: complex QKV/Wo and FFN (h=320 complex), complex RMSNorm with complex gain, PCT gate (unit-norm q/k, s=Re<qbar,kbar>*sqrt(d), alpha=sigmoid(s+b)), RoPE on interleaved (Re,Im) view, [Re;Im] concat (736 real) to tied 50258x736 embedding. dc=368, 8/8 heads (headdim 46 complex).",
+      "status": "planned",
+      "priority": "high",
+      "module": "src/model.py",
+      "design_doc": "docs/spec.md",
+      "tests": {
+        "status": "missing",
+        "files": ["src/smoke_test.py"],
+        "notes": "total ~51.3M (<0.5% vs A); init RMS ~1; RoPE rotation identity; complex matmul via (...,2) Re/Im form"
+      },
+      "subtasks": [
+        {
+          "id": "F003-1",
+          "name": "complex linear + RMSNorm primitives",
+          "status": "planned"
+        },
+        {
+          "id": "F003-2",
+          "name": "PCT gate block",
+          "status": "planned"
+        },
+        {
+          "id": "F003-3",
+          "name": "A/B param-match assert",
+          "status": "planned"
+        }
+      ],
+      "notes": "Init: Re/Im ~N(0,1/sqrt(2*fan_in)), gain 1+0i, eps 1e-6, embed N(0,0.02).",
+      "added": "2026-09-18",
+      "completed": null
+    },
+    {
+      "id": "F004",
+      "name": "masked diffusion loss and sampler",
+      "description": "MDLM compute_loss port: absorbing-state forward, t=(1-eps)*u+eps eps=1e-3, 1/t weight in fp32, antithetic pairing per 32-row micro-batch, mask prob 1-t, EOS never masked, SUBS (-inf on MASK logit), CE on masked only. Plus LLaDA-style 32-step confidence unmask/remask sampler.",
+      "status": "planned",
+      "priority": "high",
+      "module": "src/diffusion.py",
+      "design_doc": "docs/spec.md",
+      "tests": {
+        "status": "missing",
+        "files": ["src/smoke_test.py"],
+        "notes": "loss finite; SUBS kills mask short-circuit; sampler fills answer slots deterministically at temp 0"
+      },
+      "subtasks": [
+        {
+          "id": "F004-1",
+          "name": "compute_loss port",
+          "status": "planned"
+        },
+        {
+          "id": "F004-2",
+          "name": "confidence sampler",
+          "status": "planned"
+        }
+      ],
+      "notes": "MDLM code is ground truth where spec is ambiguous.",
+      "added": "2026-09-18",
+      "completed": null
+    },
+    {
+      "id": "F005",
+      "name": "ultrachat data pipeline",
+      "description": "Download HuggingFaceH4/ultrachat_200k, subsample 40k train_sft + 2k test_sft (seed 42), format turns as plain text, GPT-2 BPE + MASK token (vocab 50258), chunk to <=512, greedy-pack to 512 rows with EOS joins, doc-block masks, doc-relative RoPE positions, identical order/seeds for A/B.",
+      "status": "planned",
+      "priority": "high",
+      "module": "src/data.py",
+      "design_doc": "docs/spec.md",
+      "tests": {
+        "status": "missing",
+        "files": ["src/smoke_test.py"],
+        "notes": "packing shapes, EOS never masked, doc masks block cross-doc attention"
+      },
+      "subtasks": [
+        {
+          "id": "F005-1",
+          "name": "download/subsample/tokenize",
+          "status": "planned"
+        },
+        {
+          "id": "F005-2",
+          "name": "pack + doc masks + positions",
+          "status": "planned"
+        }
+      ],
+      "notes": "",
+      "added": "2026-09-18",
+      "completed": null
+    },
+    {
+      "id": "F006",
+      "name": "training loop",
+      "description": "Identical-hypers A/B loop: ~4600 steps x batch 128 (32x4 accum) x 512 (~300M tokens), AdamW (0.9,0.95) wd 1e-5, clip 1.0, LR in {3e-4,1e-3} via preflight probe, cosine to LR/10 + 230-step warmup, fp16 AMP (fp32 loss) with bf16 flag, grad checkpointing, ckpt every 500 + resume, gate-sum histogram logging.",
+      "status": "planned",
+      "priority": "high",
+      "module": "src/train.py",
+      "design_doc": "docs/spec.md",
+      "tests": {
+        "status": "missing",
+        "files": ["src/smoke_test.py"],
+        "notes": "20-step overfit smoke; resume-safe RNG from (seed,step,micro-batch)"
+      },
+      "subtasks": [
+        {
+          "id": "F006-1",
+          "name": "loop + schedule + AMP + ckpt/resume",
+          "status": "planned"
+        },
+        {
+          "id": "F006-2",
+          "name": "throughput + LR preflight probes",
+          "status": "planned"
+        }
+      ],
+      "notes": "",
+      "added": "2026-09-18",
+      "completed": null
+    },
+    {
+      "id": "F007",
+      "name": "copy and NIAH probes",
+      "description": "Deterministic generators (~200/cell, windows 512+1024): 2 solved demos + 1 test joined by EOT; Copy K in {8,16,32} over A-P ids 32-47 with ~ filler id 93; NIAH distractor ids 0-63 excl 30 plus 64, cue ? id 30, depths {0.1,0.25,0.5,0.75,0.9}; 32-step argmax decode on answer slots; Wilson CI + void (<=2x chance) + discrimination scoring.",
+      "status": "planned",
+      "priority": "high",
+      "module": "src/probes.py",
+      "design_doc": "docs/spec.md",
+      "tests": {
+        "status": "missing",
+        "files": ["src/smoke_test.py"],
+        "notes": "generator token-id pins + decode/score path covered in smoke test"
+      },
+      "subtasks": [
+        {
+          "id": "F007-1",
+          "name": "Copy generator + scorer",
+          "status": "planned"
+        },
+        {
+          "id": "F007-2",
+          "name": "NIAH generator + scorer",
+          "status": "planned"
+        },
+        {
+          "id": "F007-3",
+          "name": "eval runner with CIs",
+          "status": "planned"
+        }
+      ],
+      "notes": "",
+      "added": "2026-09-18",
+      "completed": null
+    },
+    {
+      "id": "F008",
+      "name": "fixed-prompt generation",
+      "description": "Sample first 20 validation conversations for both checkpoints: 32 denoising steps, 128 tokens, identical LLaDA-style confidence remasking and settings, EOS/doc rules mirrored from training.",
+      "status": "planned",
+      "priority": "medium",
+      "module": "src/generate.py",
+      "design_doc": "docs/spec.md",
+      "tests": {
+        "status": "missing",
+        "files": ["src/smoke_test.py"],
+        "notes": "sampler smoke: fixed seed produces finite shaped output"
+      },
+      "subtasks": [
+        {
+          "id": "F008-1",
+          "name": "prompt set + sampling script",
+          "status": "planned"
+        }
+      ],
+      "notes": "",
+      "added": "2026-09-18",
+      "completed": null
+    },
+    {
+      "id": "F009",
+      "name": "smoke test suite",
+      "description": "CPU suite: A/B param counts <0.5%, init RMS ~1 both variants, RoPE rotation identity, loss finite + 20-step overfit, probe generators + decode/score path, sampler runs.",
+      "status": "planned",
+      "priority": "high",
+      "module": "src/smoke_test.py",
+      "design_doc": "docs/spec.md",
+      "tests": {
+        "status": "missing",
+        "files": ["src/smoke_test.py"],
+        "notes": "written first per TDD; gates every other feature"
+      },
+      "subtasks": [
+        {
+          "id": "F009-1",
+          "name": "param/init/RoPE asserts",
+          "status": "planned"
+        },
+        {
+          "id": "F009-2",
+          "name": "loss/overfit + probe/sampler path",
+          "status": "planned"
+        }
+      ],
+      "notes": "",
+      "added": "2026-09-18",
+      "completed": null
+    },
+    {
+      "id": "F010",
+      "name": "kaggle parallel venue",
+      "description": "Kernel metadata + push script: A/B train in parallel one per T4, 50-step throughput probe then 500-step x 2-LR probe, ~4600-step full run, joint eval, ckpt every 500 for session-death resume.",
+      "status": "planned",
+      "priority": "medium",
+      "module": "kaggle/",
+      "design_doc": "docs/spec.md",
+      "tests": {
+        "status": "missing",
+        "files": [],
+        "notes": "dry-run push script without GPU spend"
+      },
+      "subtasks": [
+        {
+          "id": "F010-1",
+          "name": "kernel + push script",
+          "status": "planned"
+        }
+      ],
+      "notes": "",
+      "added": "2026-09-18",
+      "completed": null
+    },
+    {
+      "id": "F011",
+      "name": "results report",
+      "description": "results.md comparing A vs B across ELBO, probes (Wilson CIs, void/noise calls), and 20 eyeballed samples; includes param counts, wall-clock, single-seed limitation, named confounds, and sensitivity-rerun outcome if triggered (B h=832 complex).",
+      "status": "planned",
+      "priority": "medium",
+      "module": "results/",
+      "design_doc": "docs/spec.md",
+      "tests": {
+        "status": "missing",
+        "files": [],
+        "notes": "checklist review against spec section 6-7"
+      },
+      "subtasks": [
+        {
+          "id": "F011-1",
+          "name": "results.md + samples",
+          "status": "planned"
+        }
+      ],
+      "notes": "",
+      "added": "2026-09-18",
+      "completed": null
+    }
+  ]
+}
