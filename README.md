@@ -1,0 +1,1 @@
+Simple experiment to test whether replacing real-valued attention with complex-valued, phase-coherent (PCT-style, non-competing-gate) attention changes behavior in a small masked diffusion language model, relative to a real-valued control of matched parameter count, trained identically.# complex-diffusion
