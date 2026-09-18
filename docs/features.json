@@ -3,9 +3,9 @@
   "last_updated": "2026-09-18",
   "summary": {
     "total": 11,
-    "completed": 3,
+    "completed": 4,
     "in_progress": 0,
-    "planned": 8,
+    "planned": 7,
     "tests_passing": 0,
     "tests_failing": 0,
     "tests_missing": 11
@@ -116,7 +116,7 @@
       "id": "F004",
       "name": "masked diffusion loss and sampler",
       "description": "MDLM compute_loss port: absorbing-state forward, t=(1-eps)*u+eps eps=1e-3, 1/t weight in fp32, antithetic pairing per 32-row micro-batch, mask prob 1-t, EOS never masked, SUBS (-inf on MASK logit), CE on masked only. Plus LLaDA-style 32-step confidence unmask/remask sampler.",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "src/diffusion.py",
       "design_doc": "docs/spec.md",
@@ -131,17 +131,17 @@
         {
           "id": "F004-1",
           "name": "compute_loss port",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F004-2",
           "name": "confidence sampler",
-          "status": "planned"
+          "status": "completed"
         }
       ],
       "notes": "MDLM code is ground truth where spec is ambiguous.",
       "added": "2026-09-18",
-      "completed": null
+      "completed": "2026-09-18"
     },
     {
       "id": "F005",
