@@ -3,9 +3,9 @@
   "last_updated": "2026-09-18",
   "summary": {
     "total": 11,
-    "completed": 0,
+    "completed": 3,
     "in_progress": 0,
-    "planned": 11,
+    "planned": 8,
     "tests_passing": 0,
     "tests_failing": 0,
     "tests_missing": 11
@@ -44,69 +44,73 @@
       "id": "F002",
       "name": "variant A backbone and attention",
       "description": "Real-valued LLaMA-style block (RMSNorm, SwiGLU h=1408, RoPE base 10000, non-causal doc-blocked) with Apple sigmoid attention (alpha=sigmoid(QK^T/sqrt(d)+b), b init -log N). Width d=512, 8 layers/8 heads, tied 50258x512 embedding.",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "src/model.py",
       "design_doc": "docs/spec.md",
       "tests": {
         "status": "missing",
-        "files": ["src/smoke_test.py"],
+        "files": [
+          "src/smoke_test.py"
+        ],
         "notes": "param count ~51.4M; init RMS ~1; RoPE identity; 20-step overfit finite"
       },
       "subtasks": [
         {
           "id": "F002-1",
           "name": "RMSNorm + SwiGLU + RoPE + doc-block mask",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F002-2",
           "name": "sigmoid attention block",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F002-3",
           "name": "tied embedding + output head",
-          "status": "planned"
+          "status": "completed"
         }
       ],
       "notes": "",
       "added": "2026-09-18",
-      "completed": null
+      "completed": "2026-09-18"
     },
     {
       "id": "F003",
       "name": "variant B complex PCT attention",
       "description": "Complex-valued twin of F002: complex QKV/Wo and FFN (h=320 complex), complex RMSNorm with complex gain, PCT gate (unit-norm q/k, s=Re<qbar,kbar>*sqrt(d), alpha=sigmoid(s+b)), RoPE on interleaved (Re,Im) view, [Re;Im] concat (736 real) to tied 50258x736 embedding. dc=368, 8/8 heads (headdim 46 complex).",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "src/model.py",
       "design_doc": "docs/spec.md",
       "tests": {
         "status": "missing",
-        "files": ["src/smoke_test.py"],
+        "files": [
+          "src/smoke_test.py"
+        ],
         "notes": "total ~51.3M (<0.5% vs A); init RMS ~1; RoPE rotation identity; complex matmul via (...,2) Re/Im form"
       },
       "subtasks": [
         {
           "id": "F003-1",
           "name": "complex linear + RMSNorm primitives",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F003-2",
           "name": "PCT gate block",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F003-3",
           "name": "A/B param-match assert",
-          "status": "planned"
+          "status": "completed"
         }
       ],
       "notes": "Init: Re/Im ~N(0,1/sqrt(2*fan_in)), gain 1+0i, eps 1e-6, embed N(0,0.02).",
       "added": "2026-09-18",
-      "completed": null
+      "completed": "2026-09-18"
     },
     {
       "id": "F004",
@@ -118,7 +122,9 @@
       "design_doc": "docs/spec.md",
       "tests": {
         "status": "missing",
-        "files": ["src/smoke_test.py"],
+        "files": [
+          "src/smoke_test.py"
+        ],
         "notes": "loss finite; SUBS kills mask short-circuit; sampler fills answer slots deterministically at temp 0"
       },
       "subtasks": [
@@ -147,7 +153,9 @@
       "design_doc": "docs/spec.md",
       "tests": {
         "status": "missing",
-        "files": ["src/smoke_test.py"],
+        "files": [
+          "src/smoke_test.py"
+        ],
         "notes": "packing shapes, EOS never masked, doc masks block cross-doc attention"
       },
       "subtasks": [
@@ -176,7 +184,9 @@
       "design_doc": "docs/spec.md",
       "tests": {
         "status": "missing",
-        "files": ["src/smoke_test.py"],
+        "files": [
+          "src/smoke_test.py"
+        ],
         "notes": "20-step overfit smoke; resume-safe RNG from (seed,step,micro-batch)"
       },
       "subtasks": [
@@ -205,7 +215,9 @@
       "design_doc": "docs/spec.md",
       "tests": {
         "status": "missing",
-        "files": ["src/smoke_test.py"],
+        "files": [
+          "src/smoke_test.py"
+        ],
         "notes": "generator token-id pins + decode/score path covered in smoke test"
       },
       "subtasks": [
@@ -239,7 +251,9 @@
       "design_doc": "docs/spec.md",
       "tests": {
         "status": "missing",
-        "files": ["src/smoke_test.py"],
+        "files": [
+          "src/smoke_test.py"
+        ],
         "notes": "sampler smoke: fixed seed produces finite shaped output"
       },
       "subtasks": [
@@ -263,7 +277,9 @@
       "design_doc": "docs/spec.md",
       "tests": {
         "status": "missing",
-        "files": ["src/smoke_test.py"],
+        "files": [
+          "src/smoke_test.py"
+        ],
         "notes": "written first per TDD; gates every other feature"
       },
       "subtasks": [
