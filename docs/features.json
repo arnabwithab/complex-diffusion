@@ -177,7 +177,7 @@
     {
       "id": "F006",
       "name": "training loop",
-      "description": "Identical-hypers A/B loop: ~4600 steps x batch 128 (32x4 accum) x 512 (~300M tokens), AdamW (0.9,0.95) wd 1e-5, clip 1.0, LR in {3e-4,1e-3} via preflight probe, cosine to LR/10 + 230-step warmup, fp16 AMP (fp32 loss) with bf16 flag, grad checkpointing, ckpt every 500 + resume, gate-sum histogram logging.",
+      "description": "Identical-hypers A/B loop: ~2300 steps x batch 128 (32x4 accum) x 512 (~150M tokens), AdamW (0.9,0.95) wd 1e-5, clip 1.0, LR in {3e-4,1e-3} via preflight probe, cosine to LR/10 + 230-step warmup, fp16 AMP (fp32 loss) with bf16 flag, no grad checkpointing (fits 16GB), ckpt every 500 + resume, gate-sum histogram logging.",
       "status": "completed",
       "priority": "high",
       "module": "src/train.py",

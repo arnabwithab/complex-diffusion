@@ -115,7 +115,8 @@ class SigmoidAttention(nn.Module):
         s = q @ k.transpose(-1, -2) / math.sqrt(self.hd)
         alpha = torch.sigmoid(s + self.bias[None, :, None, None])
         alpha = alpha * _doc_allowed(doc_ids)[:, None]
-        self.last_gate_sum = float(alpha.sum(-1).detach().float().mean())
+        if not torch.compiler.is_compiling():
+            self.last_gate_sum = alpha.sum(-1).detach().float().mean()
         out = (alpha @ v).transpose(1, 2).reshape(B, N, -1)
         return self.wo(out)
 
@@ -147,7 +148,8 @@ class PCTAttention(nn.Module):
         s = s * math.sqrt(self.hdc)  # [B, H, N, N]
         alpha = torch.sigmoid(s + self.bias[None, :, None, None])
         alpha = alpha * _doc_allowed(doc_ids)[:, None]
-        self.last_gate_sum = float(alpha.sum(-1).detach().float().mean())
+        if not torch.compiler.is_compiling():
+            self.last_gate_sum = alpha.sum(-1).detach().float().mean()
         # real gate x complex value; einsum over keys
         out = torch.stack(
             [

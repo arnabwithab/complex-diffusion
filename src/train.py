@@ -8,7 +8,6 @@ import time
 from contextlib import nullcontext
 
 import torch
-from torch.utils.checkpoint import checkpoint
 
 from diffusion import compute_loss, doc_ids_positions
 from model import build_model
@@ -17,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 MICRO, ACCUM, BATCH = 32, 4, 128  # effective batch 128
 SEQ = 512
-TARGET_TOKENS = 300_000_000
+TARGET_TOKENS = 150_000_000
 WARMUP = 230
 CKPT_EVERY = 500
 SEED = 42
@@ -56,22 +55,8 @@ def load(d, variant, model, opt, scaler):
     return ck["step"]
 
 
-def run_block(block, h, doc, pos):
-    return checkpoint(block, h, doc, pos, use_reentrant=False)
-
-
 def forward_ckpt(model, ids, doc, pos):
-    if model.variant == "A":
-        h = model.embed(ids)
-        for b in model.blocks:
-            h = run_block(b, h, doc, pos)
-        return model.norm(h) @ model.embed.weight.T
-    dc = model.cfg["dc"]
-    h = model.embed(ids).view(*ids.shape, dc, 2)
-    for b in model.blocks:
-        h = run_block(b, h, doc, pos)
-    h = model.norm(h)
-    return h.reshape(*ids.shape, 2 * dc) @ model.embed.weight.T
+    return model(ids, doc, pos)  # no grad checkpointing: 51M fits in 16GB
 
 
 def val_elbo(model, val, device, n_batches=8):
@@ -95,6 +80,12 @@ def train(args):
     order = torch.randperm(len(train_rows), generator=torch.Generator().manual_seed(SEED))
 
     model = build_model(args.variant).to(device)
+    if args.compile:
+        try:
+            model = torch.compile(model)
+            logger.info("torch.compile on")
+        except Exception as e:
+            logger.warning("compile failed, eager fallback: %s", e)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.95),
                             weight_decay=1e-5)
     use_amp = args.amp in ("fp16", "bf16") and device.type == "cuda"
@@ -144,10 +135,12 @@ def train(args):
         step += 1
         tokens += BATCH * SEQ
         if step % 100 == 0:
-            gates = [b.attn.last_gate_sum for b in model.blocks]
-            logger.info("step %d loss %.3f tok/s %d gatesum %.2f",
-                        step, float(loss) * ACCUM, int(tokens / (time.time() - t0)),
-                        sum(gates) / len(gates))
+            gates = [b.attn.last_gate_sum for b in model.blocks
+                     if getattr(b.attn, "last_gate_sum", None) is not None]
+            gmsg = f"{float(sum(gates)/len(gates)):.2f}" if gates else "n/a"
+            logger.info("step %d loss %.3f tok/s %d gatesum %s",
+                        step, float(loss.detach()) * ACCUM,
+                        int(tokens / (time.time() - t0)), gmsg)
         if step % CKPT_EVERY == 0:
             save(args.ckpt, args.variant, model, opt, scaler, step)
     save(args.ckpt, args.variant, model, opt, scaler, step)
@@ -165,6 +158,7 @@ def main():
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--steps", type=int, default=0)  # 0 = derive from 300M tokens
     ap.add_argument("--amp", default="fp16", choices=["fp16", "bf16", "none"])
+    ap.add_argument("--compile", default=True, action=argparse.BooleanOptionalAction)
     ap.add_argument("--mode", default="full", choices=["full", "throughput", "lrs"])
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")

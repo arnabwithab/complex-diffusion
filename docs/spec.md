@@ -51,7 +51,7 @@ Both variants share the same block skeleton (RMSNorm → attention → residual;
 
 ## 4. Hardware / venue (locked)
 
-- **Primary venue: Kaggle 2×T4 (16GB each). Variants A and B train in parallel, one per GPU, in a single session (~5–7h training + ~30min eval).** Budget ~12–16h of the 30h weekly GPU allowance (worst-case metering).
+- **Primary venue: Kaggle 2×T4 (16GB each). Variants A and B train in parallel, one per GPU, in a single session (~3–5h training + ~30min eval).** Budget ~12–16h of the 30h weekly GPU allowance (worst-case metering).
 - **Pre-flight before the full run commits:** a 50-step throughput probe validates the wall-clock estimate, then a 500-step × 2-LR (3e-4 / 1e-3) × both-variants probe (~1h, parallel) selects the training LR per the §5 rule.
 - T4 is Turing — **no bf16** → fp16 AMP + gradient scaler; the 1/t-weighted loss stays in fp32 (overflow guard, since the weight can reach 1000× at small t).
 - `--amp bf16` flag retained for the 8GB laptop fallback (sequential runs, ~3–4h each at this scale).
@@ -69,7 +69,7 @@ Both variants share the same block skeleton (RMSNorm → attention → residual;
 
 ### Locked training config (identical for A and B)
 
-- ~4,600 steps (exact count = ceil(300M / (128 × 512)), set after the tokenized data is measured) × effective batch 128 × seq 512 ≈ 300M tokens.
+- ~2,300 steps (exact count = ceil(150M / (128 × 512)), set after the tokenized data is measured) × effective batch 128 × seq 512 ≈ 150M tokens (~3.8 epochs of the measured 39.5M-token train split).
 - AdamW β = (0.9, 0.95), weight decay **1e-5** (aligned to PCT §3.6's optimizer protocol), grad clip 1.0.
 - LR ∈ {3e-4, 1e-3}, selected by the §4 pre-flight probe: if both variants prefer the same LR, use it; if they disagree, use the LR with the lower mean val ELBO and report the disagreement as a caveat. Cosine decay to LR/10, 230-step linear warmup (protocol follows PCT §3.6: cosine + linear warmup + clip 1.0).
 
@@ -177,7 +177,7 @@ What each piece of the spec is drawn from, so it's clear what's being reimplemen
 
 - **Scale 51M, not 95M/123M:** fits one Kaggle session with margin; both variants + eval in a single run.
 - **Kaggle 2×T4 over 8GB laptop:** A/B train in parallel (halves wall-clock), 16GB/GPU headroom, laptop stays free. Costs fp16-only on T4 (no bf16) → fp32 loss guard, `--amp bf16` fallback for laptop.
-- **~300M tokens/variant:** ~3 epochs of the 40k-conversation subsample; meaningfully trained, both variants equally.
+- **~150M tokens/variant:** ~3.8 epochs of the 40k-conversation subsample (39.5M measured); fits one Kaggle session at measured 5–8 s/step. Downscoped from 300M after the pre-flight measured throughput (7–11.5 s/step with checkpointing).
 - **Tied embeddings:** vocab matrix counted once; makes A/B total-param matching clean at GPT-2 vocab size.
 - **Fresh minimal repo, ported MDLM loss:** the loss is ~20 lines to port; forking inherits MDLM's Lightning/data scaffolding wired to their datasets and tokenizers.
 - **dc=368/h=320 for B (convention-faithful, totals exact) with pre-declared dc=320/h=832 sensitivity rerun if B loses:** the param-fairness tradeoff at large vocab is unavoidable (§2); the rule makes the outcome interpretable either way.
