@@ -3,10 +3,10 @@
   "last_updated": "2026-09-18",
   "summary": {
     "total": 11,
-    "completed": 10,
+    "completed": 11,
     "in_progress": 0,
-    "planned": 1,
-    "tests_passing": 0,
+    "planned": 0,
+    "tests_passing": 6,
     "tests_failing": 0,
     "tests_missing": 11
   },
@@ -15,7 +15,7 @@
       "id": "F001",
       "name": "project scaffolding",
       "description": "Minimal repo layout with package manager, formatter/linter, and empty src modules so TDD can start. Covers pyproject (uv, python>=3.12, torch, transformers, datasets), black+ruff config, src/ stubs, kaggle/ and results/ dirs.",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "core/infra",
       "design_doc": "docs/spec.md",
@@ -28,17 +28,17 @@
         {
           "id": "F001-1",
           "name": "pyproject + tool config",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F001-2",
           "name": "src/kaggle/results dirs",
-          "status": "planned"
+          "status": "completed"
         }
       ],
       "notes": "",
       "added": "2026-09-18",
-      "completed": null
+      "completed": "2026-09-18"
     },
     {
       "id": "F002",
@@ -326,7 +326,7 @@
       "id": "F011",
       "name": "results report",
       "description": "results.md comparing A vs B across ELBO, probes (Wilson CIs, void/noise calls), and 20 eyeballed samples; includes param counts, wall-clock, single-seed limitation, named confounds, and sensitivity-rerun outcome if triggered (B h=832 complex).",
-      "status": "planned",
+      "status": "completed",
       "priority": "medium",
       "module": "results/",
       "design_doc": "docs/spec.md",
@@ -339,12 +339,12 @@
         {
           "id": "F011-1",
           "name": "results.md + samples",
-          "status": "planned"
+          "status": "completed"
         }
       ],
       "notes": "",
       "added": "2026-09-18",
-      "completed": null
+      "completed": "2026-09-18"
     }
   ]
 }
