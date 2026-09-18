@@ -36,6 +36,8 @@ Both variants share the same block skeleton (RMSNorm → attention → residual;
 
 **Complex-op implementation:** complex tensors are stored as real tensors with a trailing `(..., 2)` axis; complex matmul via the Re/Im block form. This avoids fp16-autocast/complex-dtype CUDA pitfalls entirely.
 
+**Gate bias note (pinned):** b init = −log 512 in both variants (N = packed row length, per the PCT/Apple convention). With doc-blocked packing a query typically sees fewer than 512 keys, so effective gate sums can sit below 1 on short docs — identical for both variants and paper-faithful, so no per-variant correction. train.py logs gate-sum histograms on real packed batches so any systematic starvation is visible before the full run.
+
 **Complex initialization (pinned):** every complex linear (QKV, W_o, FFN) initializes Re and Im independently ~ N(0, 1/√(2·fan_in)) — complex weights then have E|w|² = 1/fan_in, the complex match of a real linear's N(0, 1/√fan_in) (Trabelsi-style variance matching). Complex RMSNorm gain init = 1 + 0i, norm ε = 1e-6 (inside the mean |z|²). Tied embedding: each stored real component ~ N(0, 0.02) in both variants. smoke_test.py asserts per-layer output RMS ≈ 1 at init for both variants.
 
 ## 3. Backbone architecture (both variants)
@@ -84,8 +86,8 @@ Self-authored generators (task *shapes* follow PCT §3.5; no code borrowed), det
 
 **Shared format (pinned):** every probe sequence = **2 solved in-context demos + 1 test instance** joined by `<|endoftext|>` (id 50256 — the same structural boundary token the model sees in training; no new special tokens needed). Demos make the zero-shot format learnable in-context — the PCT paper *trained* on these formats, we don't; identical demos for both variants keep the comparison fair. Demos are fully visible; only the test instance's answer slots are `[MASK]`ed.
 
-- **Copy Memory**: source alphabet = 16 single-char tokens "A"–"P" (ids 65–80). Instance = K random source tokens, `<|endoftext|>`, filler "~" (id 126) × D, `<|endoftext|>`, answer region = the K source tokens repeated (visible in demos, `[MASK]`×K in the test instance). Sweep K ∈ {8, 16, 32}; D auto-fills the window. Score: per-token accuracy over answer slots + exact-sequence-match rate.
-- **NIAH**: distractor alphabet = 64 fixed byte-level token ids (33–96 excluding 63, plus 97). Needle value drawn from that alphabet, distractors from the remaining 63 values (needle value occurs exactly once); needle inserted at depth ∈ {0.1, 0.25, 0.5, 0.75, 0.9} of the test instance's haystack. Cue = "?" (id 63 — never an alphabet member), then 1 `[MASK]`. Demo haystacks are short (64 tokens) so the test haystack gets the window. Score: retrieval accuracy (exact needle id).
+- **Copy Memory**: source alphabet = 16 single-char tokens "A"–"P" (ids 32–47; printable-ASCII byte b maps to id b−33 in GPT-2's ordering). Instance = K random source tokens, `<|endoftext|>`, filler "~" (id 93) × D, `<|endoftext|>`, answer region = the K source tokens repeated (visible in demos, `[MASK]`×K in the test instance). Sweep K ∈ {8, 16, 32}; D auto-fills the window. Score: per-token accuracy over answer slots + exact-sequence-match rate.
+- **NIAH**: distractor alphabet = 64 fixed ids (0–63 excluding 30, plus 64). Needle value drawn from that alphabet, distractors from the remaining 63 values (needle value occurs exactly once); needle inserted at depth ∈ {0.1, 0.25, 0.5, 0.75, 0.9} of the test instance's haystack. Cue = "?" (id 30 — never an alphabet member), then 1 `[MASK]`. Demo haystacks are short (64 tokens) so the test haystack gets the window. Score: retrieval accuracy (exact needle id).
 
 **Inference protocol (pinned, identical for both variants):** the same 32-step confidence-remasking procedure as §6.3, restricted to the answer slots, with **argmax (temperature-0) decoding** for determinism; early-stops once all answer slots are filled. The decode + score path is covered in smoke_test.py.
 
