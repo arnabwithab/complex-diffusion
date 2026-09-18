@@ -118,7 +118,7 @@ def train(args):
             with ctx:
                 from diffusion import forward_diffuse, sample_t, _rng, MASK_ID, EOS_ID
 
-                rng = _rng(SEED, step, mb, ids.device)
+                rng = _rng(SEED, step, mb)
                 t = sample_t(MICRO, rng=rng).to(device)
                 with torch.no_grad():
                     noisy, mask = forward_diffuse(ids, t, rng)
