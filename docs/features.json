@@ -3,9 +3,9 @@
   "last_updated": "2026-09-18",
   "summary": {
     "total": 11,
-    "completed": 9,
+    "completed": 10,
     "in_progress": 0,
-    "planned": 2,
+    "planned": 1,
     "tests_passing": 0,
     "tests_failing": 0,
     "tests_missing": 11
@@ -302,7 +302,7 @@
       "id": "F010",
       "name": "kaggle parallel venue",
       "description": "Kernel metadata + push script: A/B train in parallel one per T4, 50-step throughput probe then 500-step x 2-LR probe, ~4600-step full run, joint eval, ckpt every 500 for session-death resume.",
-      "status": "planned",
+      "status": "completed",
       "priority": "medium",
       "module": "kaggle/",
       "design_doc": "docs/spec.md",
@@ -315,12 +315,12 @@
         {
           "id": "F010-1",
           "name": "kernel + push script",
-          "status": "planned"
+          "status": "completed"
         }
       ],
       "notes": "",
       "added": "2026-09-18",
-      "completed": null
+      "completed": "2026-09-18"
     },
     {
       "id": "F011",

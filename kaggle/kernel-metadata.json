@@ -1,0 +1,5 @@
+{"id": "complex-diffusion-ab", "title": "Complex vs Real Diffusion LM A/B",
+ "code_file": "run_all.sh", "language": "bash",
+ "kernel_type": "script", "is_private": true,
+ "enable_gpu": true, "enable_internet": true, "dataset_sources": [],
+ "competition_sources": [], "kernel_sources": []}
