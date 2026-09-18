@@ -141,8 +141,9 @@ class PCTAttention(nn.Module):
         kr = _rope_apply(k.flatten(-2), pos, self.hdc).unflatten(-1, (self.hdc, 2))
         qn = qr / torch.sqrt(qr.pow(2).sum((-1, -2), keepdim=True) + NORM_EPS)
         kn = kr / torch.sqrt(kr.pow(2).sum((-1, -2), keepdim=True) + NORM_EPS)
-        # Re<qbar_i, kbar_j> = sum_d (qr*qr' + qi*qi')
-        s = (qn[:, :, :, None, :, :] * kn[:, :, None, :, :, :]).sum((-1, -2))
+        # Re<qbar_i, kbar_j> via contracted einsum (never materialize N x N x hdc)
+        s = torch.einsum("bhic,bhjc->bhij", qn.reshape(B, self.heads, N, -1),
+                         kn.reshape(B, self.heads, N, -1))
         s = s * math.sqrt(self.hdc)  # [B, H, N, N]
         alpha = torch.sigmoid(s + self.bias[None, :, None, None])
         alpha = alpha * _doc_allowed(doc_ids)[:, None]
