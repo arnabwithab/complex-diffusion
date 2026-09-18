@@ -3,9 +3,9 @@
   "last_updated": "2026-09-18",
   "summary": {
     "total": 11,
-    "completed": 8,
+    "completed": 9,
     "in_progress": 0,
-    "planned": 3,
+    "planned": 2,
     "tests_passing": 0,
     "tests_failing": 0,
     "tests_missing": 11
@@ -271,12 +271,12 @@
       "id": "F009",
       "name": "smoke test suite",
       "description": "CPU suite: A/B param counts <0.5%, init RMS ~1 both variants, RoPE rotation identity, loss finite + 20-step overfit, probe generators + decode/score path, sampler runs.",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "src/smoke_test.py",
       "design_doc": "docs/spec.md",
       "tests": {
-        "status": "missing",
+        "status": "passing",
         "files": [
           "src/smoke_test.py"
         ],
@@ -286,17 +286,17 @@
         {
           "id": "F009-1",
           "name": "param/init/RoPE asserts",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F009-2",
           "name": "loss/overfit + probe/sampler path",
-          "status": "planned"
+          "status": "completed"
         }
       ],
       "notes": "",
       "added": "2026-09-18",
-      "completed": null
+      "completed": "2026-09-18"
     },
     {
       "id": "F010",
