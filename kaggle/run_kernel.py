@@ -13,6 +13,7 @@ SRC = next(
     c for c in (os.path.join(HERE, "..", "src"), os.path.join(HERE, "src"))
     if os.path.isdir(c)
 )
+os.chdir(os.path.dirname(SRC))  # kaggle runs script.py from elsewhere
 sys.path.insert(0, SRC)
 
 
