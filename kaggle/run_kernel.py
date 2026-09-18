@@ -28,7 +28,7 @@ def spawn(cmd, gpu, cwd):
 
 
 def main():
-    lr = sys.argv[1] if len(sys.argv) > 1 else None
+    lr = sys.argv[1] if len(sys.argv) > 1 else "3e-4"  # pre-flight LR pick per spec 5
     root = "." if os.path.exists(os.path.join("src", "train.py")) else "repo"
     if root == "repo" and not os.path.exists(os.path.join("repo", "src", "train.py")):
         run(["git", "clone", "--depth", "1", REPO, "repo"])
