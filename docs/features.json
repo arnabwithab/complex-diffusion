@@ -3,9 +3,9 @@
   "last_updated": "2026-09-18",
   "summary": {
     "total": 11,
-    "completed": 4,
+    "completed": 5,
     "in_progress": 0,
-    "planned": 7,
+    "planned": 6,
     "tests_passing": 0,
     "tests_failing": 0,
     "tests_missing": 11
@@ -147,7 +147,7 @@
       "id": "F005",
       "name": "ultrachat data pipeline",
       "description": "Download HuggingFaceH4/ultrachat_200k, subsample 40k train_sft + 2k test_sft (seed 42), format turns as plain text, GPT-2 BPE + MASK token (vocab 50258), chunk to <=512, greedy-pack to 512 rows with EOS joins, doc-block masks, doc-relative RoPE positions, identical order/seeds for A/B.",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "src/data.py",
       "design_doc": "docs/spec.md",
@@ -162,17 +162,17 @@
         {
           "id": "F005-1",
           "name": "download/subsample/tokenize",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F005-2",
           "name": "pack + doc masks + positions",
-          "status": "planned"
+          "status": "completed"
         }
       ],
       "notes": "",
       "added": "2026-09-18",
-      "completed": null
+      "completed": "2026-09-18"
     },
     {
       "id": "F006",
