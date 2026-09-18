@@ -9,10 +9,9 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SRC = next(
-    c for c in (os.path.join(HERE, "..", "src"), os.path.join(HERE, "src"))
-    if os.path.isdir(c)
-)
+CANDS = ("/kaggle/working/src", os.path.join(HERE, "src"),
+         os.path.join(HERE, "..", "src"))
+SRC = next(c for c in CANDS if os.path.exists(os.path.join(c, "train.py")))
 os.chdir(os.path.dirname(SRC))  # kaggle runs script.py from elsewhere
 sys.path.insert(0, SRC)
 
