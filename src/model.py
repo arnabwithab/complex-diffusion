@@ -105,6 +105,7 @@ class SigmoidAttention(nn.Module):
         self.qkv = nn.Linear(d, 3 * heads * hd)
         self.wo = nn.Linear(heads * hd, d)
         self.bias = nn.Parameter(torch.full((heads,), BIAS_INIT))
+        self.last_gate_sum = None
 
     def forward(self, x, doc_ids, pos):
         B, N, _ = x.shape
@@ -114,6 +115,7 @@ class SigmoidAttention(nn.Module):
         s = q @ k.transpose(-1, -2) / math.sqrt(self.hd)
         alpha = torch.sigmoid(s + self.bias[None, :, None, None])
         alpha = alpha * _doc_allowed(doc_ids)[:, None]
+        self.last_gate_sum = float(alpha.sum(-1).detach().float().mean())
         out = (alpha @ v).transpose(1, 2).reshape(B, N, -1)
         return self.wo(out)
 
@@ -127,6 +129,7 @@ class PCTAttention(nn.Module):
         self.qkv = ComplexLinear(dc, 3 * heads * hdc)
         self.wo = ComplexLinear(heads * hdc, dc)
         self.bias = nn.Parameter(torch.full((heads,), BIAS_INIT))
+        self.last_gate_sum = None
 
     def forward(self, z, doc_ids, pos):
         # z: [B, N, dc, 2]
@@ -143,6 +146,7 @@ class PCTAttention(nn.Module):
         s = s * math.sqrt(self.hdc)  # [B, H, N, N]
         alpha = torch.sigmoid(s + self.bias[None, :, None, None])
         alpha = alpha * _doc_allowed(doc_ids)[:, None]
+        self.last_gate_sum = float(alpha.sum(-1).detach().float().mean())
         # real gate x complex value; einsum over keys
         out = torch.stack(
             [
