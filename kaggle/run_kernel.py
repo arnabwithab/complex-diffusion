@@ -1,76 +1,62 @@
 #!/usr/bin/env python3
-"""Kaggle 2xT4 entrypoint: A/B in parallel, one GPU each, then joint eval.
+"""Kaggle bootstrapper: only code_file is deployed, so clone the repo, then run.
 
-Usage: python3 kaggle/run_kernel.py [lr]  (no lr -> probes only, then exit)
+Usage: python3 kaggle/run_kernel.py [lr]  (no lr -> pre-flight probes only)
+Local: runs in-place from the repo root (no clone).
 """
 
 import os
 import subprocess
 import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-def find_src():
-    roots = ["/kaggle/working", "/kaggle/input", HERE, os.getcwd()]
-    seen = []
-    for r in roots:
-        for dirpath, dirs, files in os.walk(r):
-            depth = dirpath.count(os.sep)
-            if depth - r.count(os.sep) > 4:
-                dirs[:] = []
-                continue
-            seen.append(dirpath)
-            if "train.py" in files and os.path.exists(os.path.join(dirpath, "model.py")):
-                return dirpath
-    raise SystemExit(f"train.py not found; searched: {seen[:20]}")
+REPO = "https://github.com/arnabwithab/complex-diffusion.git"
 
 
-SRC = find_src()
-os.chdir(os.path.dirname(SRC))  # kaggle runs script.py from elsewhere
-sys.path.insert(0, SRC)
-
-
-def run(cmd, gpu=None):
+def run(cmd, gpu=None, cwd=None):
     env = dict(os.environ)
     if gpu is not None:
         env["CUDA_VISIBLE_DEVICES"] = str(gpu)
     print("+", " ".join(cmd), flush=True)
-    subprocess.run(cmd, env=env, check=True)
+    subprocess.run(cmd, env=env, cwd=cwd, check=True)
+
+
+def spawn(cmd, gpu, cwd):
+    env = dict(os.environ)
+    env["CUDA_VISIBLE_DEVICES"] = str(gpu)
+    print("+", " ".join(cmd), flush=True)
+    return subprocess.Popen(cmd, env=env, cwd=cwd)
 
 
 def main():
     lr = sys.argv[1] if len(sys.argv) > 1 else None
-    run([sys.executable, "-m", "pytest", "src/smoke_test.py", "-x", "-q"])
-    if not os.path.exists("data/train.pt"):
-        run([sys.executable, "src/data.py", "--out", "data"])
+    root = "." if os.path.exists(os.path.join("src", "train.py")) else "repo"
+    if root == "repo" and not os.path.exists(os.path.join("repo", "src", "train.py")):
+        run(["git", "clone", "--depth", "1", REPO, "repo"])
+    py = sys.executable
+    try:
+        run([py, "-c", "import transformers, datasets"], cwd=root)
+    except subprocess.CalledProcessError:
+        run([py, "-m", "pip", "install", "-q", "transformers", "datasets"], cwd=root)
+    run([py, "-m", "pytest", "src/smoke_test.py", "-x", "-q"], cwd=root)
+    if not os.path.exists(os.path.join(root, "data", "train.pt")):
+        run([py, "src/data.py", "--out", "data"], cwd=root)
     if lr is None:
-        ps = [subprocess.Popen([sys.executable, "src/train.py", "--variant", v,
-                                "--data", "data", "--mode", m],
-                               env={**os.environ, "CUDA_VISIBLE_DEVICES": str(g)})
-              for (v, g, m) in (("A", 0, "throughput"), ("B", 1, "throughput"))]
-        for p in ps:
-            p.wait()
-            assert p.returncode == 0
-        ps = [subprocess.Popen([sys.executable, "src/train.py", "--variant", v,
-                                "--data", "data", "--mode", "lrs"],
-                               env={**os.environ, "CUDA_VISIBLE_DEVICES": str(g)})
-              for v, g in (("A", 0), ("B", 1))]
-        for p in ps:
-            p.wait()
-            assert p.returncode == 0
+        for mode in ("throughput", "lrs"):
+            ps = [spawn([py, "src/train.py", "--variant", v, "--data", "data",
+                         "--mode", mode], g, root) for v, g in (("A", 0), ("B", 1))]
+            for p in ps:
+                assert p.wait() == 0
         print("Pick LR per spec section 5 rule, then rerun with <lr>.")
         return
-    ps = [subprocess.Popen([sys.executable, "src/train.py", "--variant", v,
-                            "--data", "data", "--lr", lr],
-                           env={**os.environ, "CUDA_VISIBLE_DEVICES": str(g)})
-          for v, g in (("A", 0), ("B", 1))]
+    ps = [spawn([py, "src/train.py", "--variant", v, "--data", "data",
+                 "--lr", lr], g, root) for v, g in (("A", 0), ("B", 1))]
     for p in ps:
-        p.wait()
-        assert p.returncode == 0
+        assert p.wait() == 0
     for v in ("A", "B"):
-        run([sys.executable, "src/probes.py", "--ckpt", f"checkpoints/ckpt_{v}.pt",
-             "--variant", v])
-        run([sys.executable, "src/generate.py", "--ckpt", f"checkpoints/ckpt_{v}.pt",
-             "--variant", v])
+        run([py, "src/probes.py", "--ckpt", f"checkpoints/ckpt_{v}.pt",
+             "--variant", v], cwd=root)
+        run([py, "src/generate.py", "--ckpt", f"checkpoints/ckpt_{v}.pt",
+             "--variant", v], cwd=root)
     print("DONE")
 
 
